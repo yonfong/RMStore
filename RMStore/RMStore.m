@@ -630,22 +630,39 @@ typedef void (^RMStoreSuccessBlock)();
 
 - (void)finishTransaction:(SKPaymentTransaction *)transaction queue:(SKPaymentQueue*)queue
 {
-    SKPayment *payment = transaction.payment;
-	NSString* productIdentifier = payment.productIdentifier;
-    [queue finishTransaction:transaction];
-    [self.transactionPersistor persistTransaction:transaction];
+    void (^success)() = ^{
+        SKPayment *payment = transaction.payment;
+        NSString* productIdentifier = payment.productIdentifier;
+        [queue finishTransaction:transaction];
+        [self.transactionPersistor persistTransaction:transaction];
+        
+        RMAddPaymentParameters *wrapper = [self popAddPaymentParametersForIdentifier:productIdentifier];
+        if (wrapper.successBlock != nil)
+        {
+            wrapper.successBlock(transaction);
+        }
+        
+        [self postNotificationWithName:RMSKPaymentTransactionFinished transaction:transaction userInfoExtras:nil];
+        
+        if (transaction.transactionState == SKPaymentTransactionStateRestored)
+        {
+            [self notifyRestoreTransactionFinishedIfApplicableAfterTransaction:transaction];
+        }
+    };
     
-    RMAddPaymentParameters *wrapper = [self popAddPaymentParametersForIdentifier:productIdentifier];
-    if (wrapper.successBlock != nil)
-    {
-        wrapper.successBlock(transaction);
-    }
-    
-    [self postNotificationWithName:RMSKPaymentTransactionFinished transaction:transaction userInfoExtras:nil];
-    
-    if (transaction.transactionState == SKPaymentTransactionStateRestored)
-    {
-        [self notifyRestoreTransactionFinishedIfApplicableAfterTransaction:transaction];
+    if (self.transactionProcessor != nil) {
+        [self.transactionProcessor processTransaction:transaction success:success failure:^(NSError *error) {
+            SKPayment *payment = transaction.payment;
+            NSString* productIdentifier = payment.productIdentifier;
+            
+            RMAddPaymentParameters *wrapper = [self popAddPaymentParametersForIdentifier:productIdentifier];
+            if (wrapper.failureBlock != nil)
+            {
+                wrapper.failureBlock(transaction, error);
+            }
+        }];
+    } else {
+        success();
     }
 }
 

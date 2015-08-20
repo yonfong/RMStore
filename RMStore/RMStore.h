@@ -24,6 +24,7 @@
 @protocol RMStoreContentDownloader;
 @protocol RMStoreReceiptVerificator;
 @protocol RMStoreTransactionPersistor;
+@protocol RMStoreTransactionProcessor;
 @protocol RMStoreObserver;
 
 extern NSString *const RMStoreErrorDomain;
@@ -158,6 +159,13 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
  */
 @property (nonatomic, weak) id<RMStoreTransactionPersistor> transactionPersistor;
 
+/**
+ The transaction processor. Provide your own transaction processor to process a transaction and unlock the functionality in your
+     application. This allows your application to notify RMStore of a success or failure. RMStore will only finish the
+     transaction when your application successfully processes the transaction.
+ **/
+@property (nonatomic, weak) id<RMStoreTransactionProcessor> transactionProcessor;
+
 
 #pragma mark Product management
 ///---------------------------------------------
@@ -203,12 +211,6 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
 
 @end
 
-@protocol RMStoreTransactionPersistor<NSObject>
-
-- (void)persistTransaction:(SKPaymentTransaction*)transaction;
-
-@end
-
 @protocol RMStoreReceiptVerificator <NSObject>
 
 /** Verifies the given transaction and calls the given success or failure block accordingly.
@@ -219,6 +221,26 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
 - (void)verifyTransaction:(SKPaymentTransaction*)transaction
                   success:(void (^)())successBlock
                   failure:(void (^)(NSError *error))failureBlock;
+
+@end
+
+@protocol RMStoreTransactionPersistor<NSObject>
+
+- (void)persistTransaction:(SKPaymentTransaction*)transaction;
+
+@end
+
+@protocol RMStoreTransactionProcessor
+
+/**
+ Processes the given transaction and calls the given success or failure block accordingly.
+ @param transaction The transaction to be processed.
+ @param successBlock Called if the transaction is successfully processed. Must be called in the main queu.
+ @param failureBlock Called if the transaction failed to be processed. Must be called in the main queu.
+ */
+- (void)processTransaction:(SKPaymentTransaction*)transaction
+                   success:(void(^)())successBlock
+                   failure:(void (^)(NSError *error))failureBlock;
 
 @end
 
