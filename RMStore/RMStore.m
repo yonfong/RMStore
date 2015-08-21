@@ -20,6 +20,8 @@
 
 #import "RMStore.h"
 
+#import "IAPLogger.h"
+
 NSString *const RMStoreErrorDomain = @"net.robotmedia.store";
 NSInteger const RMStoreErrorCodeDownloadCanceled = 300;
 NSInteger const RMStoreErrorCodeUnknownProductIdentifier = 100;
@@ -50,11 +52,7 @@ NSString* const RMStoreNotificationStoreReceipt = @"storeReceipt";
 NSString* const RMStoreNotificationTransaction = @"transaction";
 NSString* const RMStoreNotificationTransactions = @"transactions";
 
-#if DEBUG
-#define RMStoreLog(...) NSLog(@"RMStore: %@", [NSString stringWithFormat:__VA_ARGS__]);
-#else
-#define RMStoreLog(...)
-#endif
+#define RMStoreLog(...) IAPLogInfo(@"RMStore: %@", [NSString stringWithFormat:__VA_ARGS__]);
 
 typedef void (^RMSKPaymentTransactionFailureBlock)(SKPaymentTransaction *transaction, NSError *error);
 typedef void (^RMSKPaymentTransactionSuccessBlock)(SKPaymentTransaction *transaction);
@@ -549,6 +547,7 @@ typedef void (^RMStoreSuccessBlock)();
     
     if (error.code != RMStoreErrorCodeUnableToCompleteVerification)
     { // If we were unable to complete the verification we want StoreKit to keep reminding us of the transaction
+        RMStoreLog(@"Calling finishTransaction");
         [queue finishTransaction:transaction];
     }
     

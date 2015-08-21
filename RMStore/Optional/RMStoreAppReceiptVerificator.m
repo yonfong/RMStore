@@ -21,16 +21,24 @@
 #import "RMStoreAppReceiptVerificator.h"
 #import "RMAppReceipt.h"
 
+#import "IAPLogger.h"
+
+#define RMStoreLog(...) IAPLogInfo(@"RMStore: %@", [NSString stringWithFormat:__VA_ARGS__]);
+
 @implementation RMStoreAppReceiptVerificator
 
 - (void)verifyTransaction:(SKPaymentTransaction*)transaction
                            success:(void (^)())successBlock
                            failure:(void (^)(NSError *error))failureBlock
 {
+    RMStoreLog( @"starting to verify transaction" );
+    
     RMAppReceipt *receipt = [RMAppReceipt bundleReceipt];
     const BOOL verified = [self verifyTransaction:transaction inReceipt:receipt success:successBlock failure:nil]; // failureBlock is nil intentionally. See below.
     if (verified) return;
 
+    RMStoreLog( @"Failed to verify transaction, trying refresh" );
+    
     // Apple recommends to refresh the receipt if validation fails on iOS
     [[RMStore defaultStore] refreshReceiptOnSuccess:^{
         RMAppReceipt *receipt = [RMAppReceipt bundleReceipt];
@@ -70,13 +78,25 @@
 
 - (BOOL)verifyAppReceipt:(RMAppReceipt*)receipt
 {
-    if (!receipt) return NO;
+    if (!receipt) {
+        RMStoreLog( @"No receipt" );
+        return NO;
+    }
     
-    if (![receipt.bundleIdentifier isEqualToString:self.bundleIdentifier]) return NO;
+    if (![receipt.bundleIdentifier isEqualToString:self.bundleIdentifier]) {
+        RMStoreLog( @"Bundle ID mismatch %@ - %@", receipt.bundleIdentifier, self.bundleIdentifier );
+        return NO;
+    }
     
-    if (![receipt.appVersion isEqualToString:self.bundleVersion]) return NO;
+    if (![receipt.appVersion isEqualToString:self.bundleVersion]) {
+        RMStoreLog( @"App Version mismatch %@ - %@", receipt.appVersion, self.bundleVersion );
+        return NO;
+    }
     
-    if (![receipt verifyReceiptHash]) return NO;
+    if (![receipt verifyReceiptHash]) {
+        RMStoreLog( @"Failed to verify receipt hash" );
+        return NO;
+    }
     
     return YES;
 }
