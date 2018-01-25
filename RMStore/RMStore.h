@@ -25,6 +25,7 @@
 @protocol RMStoreReceiptVerifier;
 @protocol RMStoreTransactionPersistor;
 @protocol RMStoreTransactionProcessor;
+@protocol RMStoreStorePaymentAcceptor;
 @protocol RMStoreObserver;
 
 extern NSString *const RMStoreErrorDomain;
@@ -52,6 +53,10 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
 /** Returns whether the user is allowed to make payments.
  */
 + (BOOL)canMakePayments;
+
+/** Accept store payments that were stored when the `storePaymentAcceptor` wasn't implemented or returned `NO`.
+ */
+- (void)acceptStoredStorePayments;
 
 /** Request payment of the product with the given product identifier.
  @param productIdentifier The identifier of the product whose payment will be requested.
@@ -163,9 +168,13 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
  The transaction processor. Provide your own transaction processor to process a transaction and unlock the functionality in your
      application. This allows your application to notify RMStore of a success or failure. RMStore will only finish the
      transaction when your application successfully processes the transaction.
- **/
+ */
 @property (nonatomic, weak) id<RMStoreTransactionProcessor> transactionProcessor;
 
+/**
+ The store payment acceptor. Provide your own store payment acceptor to accept payments receieved from the App Store.
+ */
+@property (nonatomic, weak) id<RMStoreStorePaymentAcceptor> storePaymentAcceptor;
 
 #pragma mark Product management
 ///---------------------------------------------
@@ -241,6 +250,18 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
 - (void)processTransaction:(SKPaymentTransaction*)transaction
                    success:(void(^)())successBlock
                    failure:(void (^)(NSError *error))failureBlock;
+
+@end
+
+@protocol RMStoreStorePaymentAcceptor
+
+/**
+ Allows RMStore to accept a payment made through the App Store. If not ready to accept, return `NO` and RMStore will store the payment. Call `acceptStoredStorePayments` at a later time for RMStore to accept the stored payments.
+ @param payment Payment to accept or store.
+ @param queue Queue the payment request was made on.
+ @param product Product for the payment.
+ */
+- (BOOL)acceptStorePayment:(SKPayment*)payment fromQueue:(SKPaymentQueue*)queue forProduct:(SKProduct*)product;
 
 @end
 
