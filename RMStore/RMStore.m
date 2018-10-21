@@ -143,7 +143,7 @@ typedef void (^RMStoreSuccessBlock)(void);
     
     SKReceiptRefreshRequest *_refreshReceiptRequest;
     void (^_refreshReceiptFailureBlock)(NSError* error);
-    void (^_refreshReceiptSuccessBlock)();
+    void (^_refreshReceiptSuccessBlock)(void);
     
     void (^_restoreTransactionsFailureBlock)(NSError* error);
     void (^_restoreTransactionsSuccessBlock)(NSArray* transactions);
@@ -654,7 +654,7 @@ typedef void (^RMStoreSuccessBlock)(void);
 
 - (void)finishTransaction:(SKPaymentTransaction *)transaction queue:(SKPaymentQueue*)queue
 {
-    void (^success)() = ^{
+    void (^success)(void) = ^{
         SKPayment *payment = transaction.payment;
         NSString* productIdentifier = payment.productIdentifier;
         [queue finishTransaction:transaction];
