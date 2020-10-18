@@ -203,13 +203,30 @@ typedef void (^RMStoreSuccessBlock)(void);
            success:(void (^)(SKPaymentTransaction *transaction))successBlock
            failure:(void (^)(SKPaymentTransaction *transaction, NSError *error))failureBlock
 {
-    [self addPayment:productIdentifier user:nil success:successBlock failure:failureBlock];
+    [self addPayment:productIdentifier quantity:1 success:successBlock failure:failureBlock];
+}
+
+- (void)addPayment:(NSString*)productIdentifier
+          quantity:(NSInteger)quantity
+           success:(void (^)(SKPaymentTransaction *transaction))successBlock
+           failure:(void (^)(SKPaymentTransaction *transaction, NSError *error))failureBlock
+{
+    [self addPayment:productIdentifier quantity:1 user:nil success:successBlock failure:failureBlock];
 }
 
 - (void)addPayment:(NSString*)productIdentifier
               user:(NSString*)userIdentifier
            success:(void (^)(SKPaymentTransaction *transaction))successBlock
            failure:(void (^)(SKPaymentTransaction *transaction, NSError *error))failureBlock
+{
+    [self addPayment:productIdentifier quantity:1 user:userIdentifier success:successBlock failure:failureBlock];
+}
+
+- (void)addPayment:(NSString*)productIdentifier
+          quantity:(NSInteger)quantity
+              user:(NSString*)userIdentifier
+           success:(void (^)(SKPaymentTransaction *transaction))successBlock
+           failure:(void (^)(SKPaymentTransaction *transaction, NSError *error))failureBlock __attribute__((availability(ios,introduced=7.0)))
 {
     __weak typeof(self) weakSelf = self;
     void(^errorBlock)(NSError *error)  = ^(NSError *error) {
@@ -224,6 +241,7 @@ typedef void (^RMStoreSuccessBlock)(void);
             errorBlock(error);
         } else {
             SKMutablePayment *payment = [SKMutablePayment paymentWithProduct:product];
+            payment.quantity = quantity;
             if ([payment respondsToSelector:@selector(setApplicationUsername:)])
             {
                 payment.applicationUsername = userIdentifier;
