@@ -127,10 +127,12 @@ typedef void (^RMStoreSuccessBlock)(void);
 
 @interface RMStore() <SKRequestDelegate>
 
+// HACK: We use a dictionary of product identifiers because the returned SKPayment is different from the one we add to the queue. Bad Apple.
+@property (nonatomic, strong) NSMutableDictionary *addPaymentParameters;
+
 @end
 
 @implementation RMStore {
-    NSMutableDictionary *_addPaymentParameters; // HACK: We use a dictionary of product identifiers because the returned SKPayment is different from the one we add to the queue. Bad Apple.
     NSMutableDictionary *_products;
     NSMutableSet *_productsRequestDelegates;
     
@@ -153,7 +155,6 @@ typedef void (^RMStoreSuccessBlock)(void);
 {
     if (self = [super init])
     {
-        _addPaymentParameters = [NSMutableDictionary dictionary];
         _products = [NSMutableDictionary dictionary];
         _productsRequestDelegates = [NSMutableSet set];
         _restoredTransactions = [NSMutableArray array];
@@ -210,29 +211,34 @@ typedef void (^RMStoreSuccessBlock)(void);
            success:(void (^)(SKPaymentTransaction *transaction))successBlock
            failure:(void (^)(SKPaymentTransaction *transaction, NSError *error))failureBlock
 {
-    SKProduct *product = [self productForIdentifier:productIdentifier];
-    if (product == nil)
-    {
-        RMStoreLog(@"unknown product id %@", productIdentifier)
-        if (failureBlock != nil)
-        {
-            NSError *error = [NSError errorWithDomain:RMStoreErrorDomain code:RMStoreErrorCodeUnknownProductIdentifier userInfo:@{NSLocalizedDescriptionKey: NSLocalizedStringFromTable(@"Unknown product identifier", @"RMStore", @"Error description")}];
+    __weak typeof(self) weakSelf = self;
+    void(^errorBlock)(NSError *error)  = ^(NSError *error) {
+        if (failureBlock) {
             failureBlock(nil, error);
         }
-        return;
-    }
-    SKMutablePayment *payment = [SKMutablePayment paymentWithProduct:product];
-    if ([payment respondsToSelector:@selector(setApplicationUsername:)])
-    {
-        payment.applicationUsername = userIdentifier;
-    }
+    };
     
-    RMAddPaymentParameters *parameters = [[RMAddPaymentParameters alloc] init];
-    parameters.successBlock = successBlock;
-    parameters.failureBlock = failureBlock;
-    _addPaymentParameters[productIdentifier] = parameters;
+    id completeBlock = ^(SKProduct *product) {
+        if (!product) {
+            NSError *error = [NSError errorWithDomain:RMStoreErrorDomain code:RMStoreErrorCodeUnknownProductIdentifier userInfo:@{NSLocalizedDescriptionKey: NSLocalizedStringFromTable(@"Unknown product identifier", @"RMStore", @"Error description")}];
+            errorBlock(error);
+        } else {
+            SKMutablePayment *payment = [SKMutablePayment paymentWithProduct:product];
+            if ([payment respondsToSelector:@selector(setApplicationUsername:)])
+            {
+                payment.applicationUsername = userIdentifier;
+            }
+            
+            RMAddPaymentParameters *parameters = [[RMAddPaymentParameters alloc] init];
+            parameters.successBlock = successBlock;
+            parameters.failureBlock = failureBlock;
+            weakSelf.addPaymentParameters[productIdentifier] = parameters;
+            
+            [[SKPaymentQueue defaultQueue] addPayment:payment];
+        }
+    };
     
-    [[SKPaymentQueue defaultQueue] addPayment:payment];
+    [self fetchProduct:productIdentifier success:completeBlock failure:errorBlock];
 }
 
 - (void)requestProducts:(NSSet*)identifiers
@@ -255,6 +261,39 @@ typedef void (^RMStoreSuccessBlock)(void);
     
     [productsRequest start];
 }
+
+- (void)fetchProduct:(NSString *)identifier
+             success:(void (^)(SKProduct *product))success
+             failure:(void (^)(NSError *error))failure
+{
+    if (!identifier) {
+        NSString *errorDesc = NSLocalizedStringFromTable(@"Unknown product identifier", @"RMStore", @"Error description");
+        NSError *error = [NSError errorWithDomain:RMStoreErrorDomain
+                                             code:RMStoreErrorCodeUnknownProductIdentifier
+                                         userInfo:@{NSLocalizedDescriptionKey: errorDesc}];
+        if (failure) {
+            failure(error);
+        }
+        return;
+    }
+    
+    SKProduct *product = [self productForIdentifier:identifier];
+    if (product) {
+        success(product);
+        return;
+    }
+    
+    // 若内存中没有，网络获取
+    NSSet *set = [[NSSet alloc] initWithArray:@[identifier]];
+    [self requestProducts:set
+                  success:^(NSArray *products, NSArray *invalidProductIdentifiers)
+     {
+        if (success) {
+            success(products.firstObject);
+        }
+     } failure:failure];
+}
+
 
 - (void)restoreTransactions
 {
@@ -778,6 +817,16 @@ typedef void (^RMStoreSuccessBlock)(void);
 - (void)removeProductsRequestDelegate:(RMProductsRequestDelegate*)delegate
 {
     [_productsRequestDelegates removeObject:delegate];
+}
+
+
+- (NSMutableDictionary *)addPaymentParameters
+{
+    if (!_addPaymentParameters) {
+        _addPaymentParameters = [NSMutableDictionary dictionary];
+    }
+    
+    return _addPaymentParameters;
 }
 
 @end
