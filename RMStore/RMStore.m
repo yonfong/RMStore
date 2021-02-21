@@ -366,6 +366,34 @@ typedef void (^RMStoreSuccessBlock)(void);
     [_refreshReceiptRequest start];
 }
 
+- (void)base64Receipt:(void(^)(NSString *base64Data))success
+              failure:(void(^)(NSError *error))failure
+{
+    void(^handler)(NSURL *url) = ^(NSURL *url) {
+        NSData *data = [NSData dataWithContentsOfURL:url];
+        NSString *base64Data = [data base64EncodedStringWithOptions:0];
+        if (success) {
+            success(base64Data);
+        }
+    };
+    
+    NSURL *URL = [NSBundle mainBundle].appStoreReceiptURL;
+    if (URL) {
+        handler(URL);
+    }else {
+        [self refreshReceiptOnSuccess:^{
+            NSURL *URL = [NSBundle mainBundle].appStoreReceiptURL;
+            if (URL) {
+                handler(URL);
+            }else {
+                if (failure) {
+                    failure([NSError errorWithDomain:RMStoreErrorDomain code:100001 userInfo:@{NSLocalizedDescriptionKey : @"None appStoreReceiptUR"}]);
+                }
+            }
+        } failure:failure];
+    }
+}
+
 #pragma mark Product management
 
 - (SKProduct*)productForIdentifier:(NSString*)productIdentifier

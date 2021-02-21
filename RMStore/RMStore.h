@@ -167,6 +167,12 @@ extern NSInteger const RMStoreErrorCodeUnableToCompleteVerification;
 - (void)refreshReceiptOnSuccess:(void (^)(void))successBlock
                         failure:(void (^)(NSError *error))failureBlock __attribute__((availability(ios,introduced=7.0)));
 
+/**
+ 获取base64的票据，主要用于服务器的票据校验
+ */
+- (void)base64Receipt:(void(^)(NSString *base64Data))success
+              failure:(void(^)(NSError *error))failure;
+
 ///---------------------------------------------
 /// @name Setting Delegates
 ///---------------------------------------------
